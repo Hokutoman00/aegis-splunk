@@ -31,7 +31,58 @@ Most "resilient" AI gateways — LiteLLM, OpenRouter, Portkey, even TrueFoundry'
 
 ## Disclosure
 
-`aegis-splunk` is built on top of an earlier sibling project, `aegis-resilient-agents`, which won the TrueFoundry "Resilient Agents" sub-track at DevNetwork [AI+ML] Hackathon 2026. The Splunk-specific work — MCP failover layer, Splunk hosted-models provider, HEC audit-log emission, chaos engine Splunk integration, the demo scenario over Splunk telemetry, and this repository's architecture — is new for this hackathon. The core hedge / fallback / L4 semantic primitives are reused. Resubmission policy confirmed via `#splunk-ai-hackathon` Slack before submitting.
+`aegis-splunk` is built on top of an earlier sibling project, `aegis-resilient-agents`, which won the TrueFoundry "Resilient Agents" sub-track at DevNetwork [AI+ML] Hackathon 2026. The Splunk-specific work — MCP failover layer, Splunk hosted-models provider, HEC audit-log emission, chaos engine Splunk integration, the demo scenario over Splunk telemetry, the adaptive immunity organs (`src/aegis/immunity.ts`), the generative stance field (`src/aegis/stances.ts`), and this repository's architecture — is new for this hackathon. The core hedge / fallback / L4 semantic primitives are reused. Resubmission policy confirmed via `#splunk-ai-hackathon` Slack before submitting.
+
+---
+
+## Verify in 5 minutes (for judges)
+
+Three things judges typically want to verify quickly. Each takes under 2 minutes.
+
+### 1. Tests pass (60 seconds)
+
+```bash
+git clone https://github.com/Hokutoman00/aegis-splunk
+cd aegis-splunk
+bun install
+bun test
+```
+
+Expected: **99 passing, 0 failing**, suite completes in ~1.3 seconds. Includes contract tests for the Splunk MCP proxy, HEC audit emitter (timeout + missing-token branches), the 4 adaptive immunity organs, and the generative stance field.
+
+### 2. Adaptive immunity + stance field run end-to-end (60 seconds)
+
+```bash
+bun test src/aegis/immunity.test.ts src/aegis/stances.test.ts src/aegis/l6-chaos-immunity.test.ts
+```
+
+Expected: **31 passing**. Covers `AntibodyCatalog`, `TCellMemory`, `InoculationScheduler`, `AutoimmuneGuard`, the recursive stance-generation loop that produces `Curator` / `Auditor` / `Cassandra` / `Historian`, and the integration that wires all four organs into the chaos engine.
+
+### 3. HEC events appear in a real Splunk index (3 minutes — requires a local Splunk Enterprise install)
+
+Skip if you don't have Splunk locally; the demo video at the top of the Devpost submission shows this running.
+
+```bash
+export SPLUNK_HEC_URL=http://localhost:8088/services/collector
+export SPLUNK_HEC_TOKEN=<your-token>
+bun run test-live-hec.ts  # sends 3 aegis:chaos + aegis:mcp-failover events
+```
+
+Expected: each event returns `{ "text": "Success", "code": 0 }`. Then in Splunk Web (`localhost:8000`), search:
+
+```spl
+index=main sourcetype="aegis:*" earliest=-10m
+```
+
+You should see the 3 events indexed, plus a stance-field snapshot field showing which initial stances voted and which emerged stances surfaced.
+
+### What the "refused to collapse" claim looks like in code
+
+```bash
+grep -n "refused_to_collapse" src/aegis/stances.ts
+```
+
+Expected: `refused_to_collapse: true` as a literal type, and `runStanceField()`'s return type intentionally omits `chosen`. The field of opinions is the output; the Splunk consumer (SOC analyst, dashboard, judge) selects their own rooting. Multi-agent frameworks always produce a chosen decision; we don't.
 
 ---
 
