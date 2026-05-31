@@ -1,0 +1,157 @@
+# aegis-splunk — Resilience layer for Splunk's agentic stack
+
+[![Hackathon](https://img.shields.io/badge/Splunk_Agentic_Ops_Hackathon-2026-orange)](https://splunk.devpost.com/)
+[![Track](https://img.shields.io/badge/Track-Platform_%26_Developer_Experience-blue)](https://splunk.devpost.com/details/prizes)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+
+> **Hedge first, fallback second, continuously chaos-verified — for agents that run on top of Splunk.**
+
+## The scenario judges will recognize
+
+A SOC analyst is mid-P1 incident response. Their agentic AI agent — built on Splunk's SAIA, calling MCP tools, reasoning over hosted models — suddenly stops responding. Behind the scenes the LLM provider returned `429` or `400 credit_balance_too_low`, or the Splunk MCP Server timed out. The agent goes dark. No telemetry on which model produced which decision. The analyst loses minutes they don't have.
+
+Most "resilient" AI gateways — LiteLLM, OpenRouter, Portkey, even TrueFoundry's default Virtual Model fallback — **silently fail** on the `400 credit_balance_too_low` case. The HTTP code is in the 4xx range, so the gateway's fallback list (typically `[401, 403, 408, 429, 500, 502, 503]`) doesn't trigger. ([LiteLLM issue #24320](https://github.com/BerriAI/litellm/issues/24320) documents the gap across the industry.)
+
+## What aegis-splunk adds
+
+`aegis-splunk` sits under the agent and above the providers — including Splunk's hosted models — and turns provider/MCP failures into something Splunk can observe and recover from.
+
+- **Hedge across providers**: parallel calls to Anthropic / OpenAI / Gemini / **Splunk-hosted `gpt-oss-120b` / `gpt-oss-20b` / Foundation AI Security**, first usable response wins, late losers canceled.
+- **Fallback chain that catches what gateways miss**: an L4 semantic layer reclassifies provider errors like `credit_balance_too_low` as fallback-eligible, so the agent never silently breaks on a non-standard 4xx.
+- **MCP failover for Splunk MCP Server**: aegis-splunk proxies the official Splunk MCP Server (Splunkbase #7931). On primary timeout or 5xx it transparently fails over to a thin REST-backed shim that exposes the same tool surface against Splunk's `/services/search/jobs`.
+- **Continuous chaos verification, exported to Splunk**: a chaos engine periodically simulates provider and MCP outages **in shadow** and emits a structured audit event per drill. The audit log is ingested into Splunk via HEC (sourcetype `aegis:chaos`); the chaos verification trace IS the Splunk observability artifact.
+- **One-line agent config**: drop-in OpenAI-SDK-compatible base URL. Existing agents do not need to be rewritten.
+
+[ARCHITECTURE.md](./ARCHITECTURE.md) shows how aegis-splunk composes with Splunk MCP Server, Splunk hosted models, and the external providers.
+
+## Track + bonus stack
+
+- Primary: **Best of Platform & Developer Experience** ($3,000)
+- Bonus: **Best Use of Splunk Hosted Models** ($1,000) — `gpt-oss-120b`, `gpt-oss-20b`, and Foundation AI Security are first-class providers in the hedge/fallback chain.
+
+## Disclosure
+
+`aegis-splunk` is built on top of an earlier sibling project, `aegis-resilient-agents`, which won the TrueFoundry "Resilient Agents" sub-track at DevNetwork [AI+ML] Hackathon 2026. The Splunk-specific work — MCP failover layer, Splunk hosted-models provider, HEC audit-log emission, chaos engine Splunk integration, the demo scenario over Splunk telemetry, and this repository's architecture — is new for this hackathon. The core hedge / fallback / L4 semantic primitives are reused. Resubmission policy confirmed via `#splunk-ai-hackathon` Slack before submitting.
+
+---
+
+## The 7 layers
+
+| Layer | Job | Owner | Invariant monitored |
+|------:|---|---|---|
+| **L0** | **Hedge** parallel requests on TTFT > p95 | Aegis | hedge cost < latency benefit (cost/latency receipt) |
+| **L1** | **Retry** with exponential backoff + jitter | TF Gateway | retries are non-destructive (tool side-effect taxonomy) |
+| **L2** | **Model fallback** within provider | TF Virtual Model | configured chain still has reachable models |
+| **L3** | **Provider fallback** across providers | TF Virtual Model | TF Gateway itself is reachable (heartbeat) |
+| **L4** | **Semantic error fallback** — error.type / .code | Aegis | error format stable (structured-first, regex fallback) |
+| **L5** | **Graceful degradation contract** — budget / SLA / quality | Aegis | user contract is honored |
+| **L6** | **Continuous self-chaos** in shadow | Aegis | chaos doesn't harm real users (output divergence monitored) |
+
+Every response carries a signed **Aegis Receipt** — a JSON envelope showing which providers were tried, which layers fired, which contract budgets were spent, and how long ago Aegis last survived a chaos drill. See [docs/RECEIPT.md](./docs/RECEIPT.md).
+
+## The differentiator: L4 catches what others miss
+
+```
+[2026-05-10 02:18:32]  user → Aegis → TF Virtual Model "claude-with-fallback"
+[Aegis L0]             hedge fired (p95 = 1.5s exceeded)
+[TF L1/L2]             anthropic/claude-sonnet-4.5 → 400 credit_balance_too_low
+[TF L3]                fallback codes [401,403,...,503] don't include 400 → pass-through
+[Aegis L4]             error.type=invalid_request_error + message="credit balance"
+                       → reclassified as fallback-eligible
+                       → routed to openai/gpt-4.1
+[OpenAI]               200 OK, 320ms TTFT
+[Aegis L0]             cancel hedge (cost saved: ~$0.0001)
+[Aegis Receipt]        attached to response
+```
+
+This single error class (`credit_balance_too_low`) is what brings down most LLM apps the moment a credit card expires. Aegis is the first agent runtime to handle it.
+
+## Demo scenarios (5/23-25 recording)
+
+| # | Failure injected | Layers that fire | Visible UX |
+|---|---|---|---|
+| A | hedge race (p95 spike) | L0 only | "Hedge canceled in 80ms" annotation |
+| B | Anthropic `credit_balance_too_low` 400 | L4 catches, routes to OpenAI | "Provider switched" + Receipt |
+| C | MCP server (search) returns 30% errors | L0 MCP hedge (READ_HEDGE) wins | Slight latency, no error |
+| D | TF Gateway itself returns 503 | TF SPOF bypass → direct provider | Receipt shows `tf_used: false` |
+| E | All providers fail | L5 graceful contract + apologetic UX | Honest "I can't right now, but here's why" |
+| F | Shadow chaos | L6 background drill | Receipt: `last_chaos_survival: 47s ago` |
+
+All scenarios use [Toxiproxy](https://github.com/Shopify/toxiproxy) to inject *real* network failures, not mocked errors.
+
+## Quick start
+
+```bash
+bun install
+cp .env.example .env.local
+# fill in TRUEFOUNDRY_API_KEY from https://aegis-hackathon.truefoundry.cloud/
+
+bun run dev
+# server: http://localhost:3000
+
+# exercise every layer in one shot
+bash examples/demo.sh
+```
+
+`/v1/chat/completions` is OpenAI SDK-compatible (non-streaming and SSE
+streaming both). Drop-in for any code already using the OpenAI SDK — just
+point `base_url` at Aegis instead of `api.openai.com`.
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/` | identity / motto / configured virtual model |
+| `GET` | `/health` | uptime probe |
+| `POST` | `/v1/chat/completions` | OpenAI-compat chat (stream + non-stream) |
+| `POST` | `/v1/mcp/classify` | classify a tool name (READ_HEDGE / WRITE_TIED / UNKNOWN_TIED) |
+| `POST` | `/v1/mcp/call` | execute a tool with classification-aware resilience |
+| `GET` | `/v1/chaos/status` | latest L6 chaos drill outcome |
+
+### Tests
+
+```bash
+bun test
+# 50 tests, 0 fail, ~150 assertions, <1s
+```
+
+Lint / typecheck:
+
+```bash
+bun run lint && bun run typecheck
+```
+
+## Tech stack
+
+- **Runtime**: [Bun](https://bun.sh) (≥1.3) + TypeScript (strict)
+- **Server**: [Hono](https://hono.dev/) (with `streamSSE` for token streaming)
+- **LLM**: OpenAI SDK pointed at TrueFoundry AI Gateway base URL
+- **Agents**: [OpenAI Agents SDK (TypeScript)](https://openai.github.io/openai-agents-js/) for tool orchestration
+- **MCP**: [TrueFoundry MCP Gateway](https://www.truefoundry.com/mcp-gateway) for tool servers
+- **Chaos**: [Toxiproxy](https://github.com/Shopify/toxiproxy) for real network failure injection
+- **Observability**: TrueFoundry AI Monitoring (OTel-compatible) feeding the Aegis Receipt
+- **Lint/format**: [Biome](https://biomejs.dev/)
+
+## Docs
+
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — full 7-layer design, invariants, and degraded behaviors
+- [docs/RECEIPT.md](./docs/RECEIPT.md) — Aegis Receipt JSON schema
+- [AGENTS.md](./AGENTS.md) — coding-agent contract (conventions, no-go list, test commands)
+- [docs/DEMO-SCRIPT.md](./docs/DEMO-SCRIPT.md) — 3-minute submission video plan (to be filled)
+
+## Hackathon submission
+
+| Field | Detail |
+|---|---|
+| Hackathon | [DevNetwork AI + ML Hackathon 2026](https://devnetwork-ai-ml-hack-2026.devpost.com/) |
+| Challenge | TrueFoundry "Resilient Agents" ($1,500 + $500/$200 sponsor prize) |
+| Submission deadline | 2026-05-28 PDT 10am |
+| Team | Solo (Hokuto Torigoe) |
+
+## Acknowledgments
+
+TrueFoundry for sponsoring the challenge and Sai Krishna (TF DevRel) for clarifying that direct Gateway integration is Criteria #1. The [LiteLLM issue #24320 thread](https://github.com/BerriAI/litellm/issues/24320) for documenting the industry-wide `credit_balance_too_low` gap that Aegis L4 closes.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
