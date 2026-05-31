@@ -83,6 +83,10 @@ describe('ReceiptBuilder', () => {
       last_chaos_survival: null,
       total_drills: 5,
       survival_rate: 1,
+      antibody_coverage: 0,
+      autoimmune_enabled: true,
+      autoimmune_net_seconds_helped: 0,
+      drills_skipped_by_autoimmune: 0,
     });
     expect(b.build().layers_fired).not.toContain('L6');
 
@@ -92,6 +96,10 @@ describe('ReceiptBuilder', () => {
       last_chaos_survival: null,
       total_drills: 6,
       survival_rate: 1,
+      antibody_coverage: 0,
+      autoimmune_enabled: true,
+      autoimmune_net_seconds_helped: 0,
+      drills_skipped_by_autoimmune: 0,
     });
     expect(b2.build().layers_fired).toContain('L6');
   });

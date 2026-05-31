@@ -16,7 +16,7 @@ Recording orchestrator: `demo/run-demo.sh` brings up the server, the chaos casca
 | 4 — aegis-splunk hedges | T+1:25 → T+2:00 | Agent resumes, response continues seamlessly | New events arriving — `sourcetype=aegis:chaos`, `sourcetype=aegis:mcp-failover` | "Layer zero fires…" | Overlay: **`HEDGE → gpt-oss-120b (Splunk hosted)`** then **`MCP REST shim engaged`** |
 | 5 — Splunk shows the win | T+2:00 → T+2:30 | Receipt JSON streams into the chat as a debug fold | Dashboard panel highlights: `winner=hedge`, `fallback_used=true`, `survival_rate=1.0` | "Every recovery is a Splunk event." | Lower-third: **HEC sourcetypes: `aegis:chaos`, `aegis:mcp-failover`** |
 | 6 — Recovery complete | T+2:30 → T+2:50 | Agent delivers investigation summary; analyst types "thanks" | Dashboard: green — recovery latency < 2s | "The analyst saw no break." | Overlay: **`MTTR: 1.8s` `Receipt: layers_fired=[L0, L1, L4]`** |
-| 7 — Close | T+2:50 → T+2:55 | Black card → 13-tag arch diagram | — | "aegis-splunk. Open source. MIT." | **github.com/hokut/aegis-splunk · MIT** |
+| 7 — Close | T+2:50 → T+2:55 | Black card → 13-tag arch diagram | — | "aegis-splunk. Open source. MIT." | **github.com/Hokutoman00/aegis-splunk · MIT** |
 
 ---
 
@@ -57,7 +57,7 @@ T+1:25  HEDGE → gpt-oss-120b (Splunk hosted)
 T+1:35  MCP REST shim engaged → /services/search/jobs
 T+2:00  HEC sourcetypes: aegis:chaos · aegis:mcp-failover
 T+2:30  MTTR: 1.8s · Receipt: layers_fired=[L0, L1, L4]
-T+2:50  github.com/hokut/aegis-splunk · MIT
+T+2:50  github.com/Hokutoman00/aegis-splunk · MIT
 ```
 
 ---
