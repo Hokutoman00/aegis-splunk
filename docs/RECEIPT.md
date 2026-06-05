@@ -39,6 +39,13 @@ Every Aegis response carries a Receipt: a JSON envelope summarizing what happene
 
   "layers_fired": ["L4"],
 
+  "trust_posture": {
+    "verdict": "degraded",
+    "human_action": "Recovery succeeded. Search Splunk for aegis:* events to audit which layer fired and why.",
+    "splunk_query": "index=main sourcetype=\"aegis:*\" earliest=-1h | search request_id=\"01HWXY3K8VQS6N4MDPB7E9T2RJ\"",
+    "provenance": ["L4", "rule:anthropic.400.invalid_request_error.credit_balance"]
+  },
+
   "l0_hedge": {
     "fired": false,
     "trigger_threshold_ms": 1500,
