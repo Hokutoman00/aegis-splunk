@@ -3,15 +3,18 @@
 Usage:
     python demo/video/render_frames.py --out demo/video/out
 
-Produces 8 PNGs:
-    01_title.png         — 1920x1080 full-screen title card (T+0:00)
-    02_lower_mcp_tool.png — 1920x120 lower-third overlay (T+0:20)
-    03_lower_chaos.png    — 1920x120 lower-third overlay, red (T+0:55)
-    04_lower_hedge.png    — 1920x120 lower-third overlay, amber (T+1:25)
-    05_lower_mcp_shim.png — 1920x120 lower-third overlay, amber (T+1:35)
-    06_lower_hec.png      — 1920x120 lower-third overlay, green (T+2:00)
-    07_lower_mttr.png     — 1920x120 lower-third overlay, green (T+2:30)
-    08_closing.png        — 1920x1080 full-screen close (T+2:50)
+Produces 11 PNGs (9 lower-thirds + title + closing):
+    01_title.png                — 1920x1080 full-screen title card (T+0:00)
+    02_lower_mcp_tool.png       — MCP tool call (blue)
+    03_lower_chaos.png          — 400 credit_balance_too_low (red)
+    04_lower_l4.png             — L4 reclassifies fallback (amber)
+    05_lower_hedge.png          — gpt-oss-120b hedge wins (amber)
+    06_lower_mcp_shim.png       — REST shim engaged (amber)
+    07_lower_trust_degraded.png — trust_posture: degraded (amber)
+    08_lower_hec.png            — HEC events indexed (green)
+    09_lower_mttr.png           — MTTR + Receipt (green)
+    10_lower_trust_trusted.png  — trust_posture: trusted (green)
+    11_closing.png              — 1920x1080 full-screen close (T+2:48)
 
 Pure PIL, no network, reproducible. Pairs with demo/video/storyboard.md.
 """
@@ -23,7 +26,6 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-# Palette (matches reference_hackathon_submission_workflow_2026-05-30 convention).
 BG = (16, 18, 22)
 FG = (220, 225, 232)
 DIM = (140, 150, 165)
@@ -39,7 +41,6 @@ GITHUB_URL = "github.com/Hokutoman00/aegis-splunk"
 
 
 def _try_font(size: int) -> ImageFont.FreeTypeFont:
-    """Best-effort font lookup. Falls back to PIL default if no TTF on the system."""
     candidates = [
         "C:/Windows/Fonts/segoeui.ttf",
         "C:/Windows/Fonts/arial.ttf",
@@ -80,10 +81,9 @@ def render_title(out: pathlib.Path) -> None:
     line1 = "P1 incident response"
     line2 = "02:14 AM"
     sub = "aegis-splunk — resilience layer for Splunk's agentic stack"
-    # Center-vertical layout
-    w1, _ = d.textbbox((0, 0), line1, font=f_lg)[2:]
-    w2, _ = d.textbbox((0, 0), line2, font=f_md)[2:]
-    ws, _ = d.textbbox((0, 0), sub, font=f_sm)[2:]
+    w1 = d.textbbox((0, 0), line1, font=f_lg)[2]
+    w2 = d.textbbox((0, 0), line2, font=f_md)[2]
+    ws = d.textbbox((0, 0), sub, font=f_sm)[2]
     d.text(((FRAME_W - w1) / 2, 380), line1, font=f_lg, fill=FG)
     d.text(((FRAME_W - w2) / 2, 510), line2, font=f_md, fill=ACCENT_BLUE)
     d.text(((FRAME_W - ws) / 2, 650), sub, font=f_sm, fill=DIM)
@@ -96,15 +96,11 @@ def render_lower_third(
     text: str,
     accent: tuple[int, int, int],
 ) -> None:
-    """Semi-transparent lower-third banner. Composited over live capture in OBS."""
     img = Image.new("RGBA", (LOWER_W, LOWER_H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # Translucent dark background
     d.rectangle([(0, 0), (LOWER_W, LOWER_H)], fill=(16, 18, 22, 215))
-    # Left accent bar
     d.rectangle([(0, 0), (8, LOWER_H)], fill=accent + (255,))
-    f = _try_mono(46)
-    # Center text vertically
+    f = _try_mono(44)
     tb = d.textbbox((0, 0), text, font=f)
     th = tb[3] - tb[1]
     d.text((40, (LOWER_H - th) / 2 - 4), text, font=f, fill=FG + (255,))
@@ -118,18 +114,18 @@ def render_closing(out: pathlib.Path) -> None:
     f_md = _try_font(48)
     f_sm = _try_mono(38)
     name = "aegis-splunk"
+    tagline = "Hedge first, fallback second, continuously chaos-verified."
     license_line = "MIT licensed · open source"
     repo = GITHUB_URL
-    tagline = "Hedge first, fallback second, continuously chaos-verified."
-    wn, _ = d.textbbox((0, 0), name, font=f_lg)[2:]
-    wl, _ = d.textbbox((0, 0), license_line, font=f_md)[2:]
-    wr, _ = d.textbbox((0, 0), repo, font=f_sm)[2:]
-    wt, _ = d.textbbox((0, 0), tagline, font=f_md)[2:]
+    wn = d.textbbox((0, 0), name, font=f_lg)[2]
+    wt = d.textbbox((0, 0), tagline, font=f_md)[2]
+    wl = d.textbbox((0, 0), license_line, font=f_md)[2]
+    wr = d.textbbox((0, 0), repo, font=f_sm)[2]
     d.text(((FRAME_W - wn) / 2, 320), name, font=f_lg, fill=ACCENT_BLUE)
     d.text(((FRAME_W - wt) / 2, 470), tagline, font=f_md, fill=FG)
     d.text(((FRAME_W - wl) / 2, 600), license_line, font=f_md, fill=DIM)
     d.text(((FRAME_W - wr) / 2, 700), repo, font=f_sm, fill=ACCENT_AMBER)
-    img.save(out / "08_closing.png")
+    img.save(out / "11_closing.png")
 
 
 def main() -> int:
@@ -143,26 +139,35 @@ def main() -> int:
 
     render_title(out)
     render_lower_third(out, "02_lower_mcp_tool.png",
-                       "MCP tool: splunk_search · Splunk MCP Server #7931",
+                       "MCP tool: splunk_search  *  Splunk MCP Server #7931",
                        ACCENT_BLUE)
     render_lower_third(out, "03_lower_chaos.png",
-                       "CHAOS: anthropic_429 · CHAOS: splunk_mcp_503",
+                       "Anthropic: 400 credit_balance_too_low  *  gateway misses it",
                        ACCENT_RED)
-    render_lower_third(out, "04_lower_hedge.png",
-                       "HEDGE -> gpt-oss-120b (Splunk hosted)",
+    render_lower_third(out, "04_lower_l4.png",
+                       "L4 semantic: reclassifies 400 as fallback-eligible",
                        ACCENT_AMBER)
-    render_lower_third(out, "05_lower_mcp_shim.png",
-                       "MCP REST shim engaged -> /services/search/jobs",
+    render_lower_third(out, "05_lower_hedge.png",
+                       "L0 hedge fires  *  Splunk gpt-oss-120b wins race",
                        ACCENT_AMBER)
-    render_lower_third(out, "06_lower_hec.png",
-                       "HEC sourcetypes: aegis:chaos · aegis:mcp-failover",
+    render_lower_third(out, "06_lower_mcp_shim.png",
+                       "MCP timeout  *  REST shim -> /services/search/jobs",
+                       ACCENT_AMBER)
+    render_lower_third(out, "07_lower_trust_degraded.png",
+                       "trust_posture: degraded  *  approval required before remediation",
+                       ACCENT_AMBER)
+    render_lower_third(out, "08_lower_hec.png",
+                       "HEC indexed: aegis:chaos  *  aegis:mcp-failover",
                        ACCENT_GREEN)
-    render_lower_third(out, "07_lower_mttr.png",
-                       "MTTR: 1.8s · Receipt: layers_fired=[L0, L1, L4]",
+    render_lower_third(out, "09_lower_mttr.png",
+                       "MTTR: 1.8s  *  layers_fired=[L0, L4, MCP]  *  Receipt signed",
+                       ACCENT_GREEN)
+    render_lower_third(out, "10_lower_trust_trusted.png",
+                       "trust_posture: trusted  *  splunk_query ready to paste",
                        ACCENT_GREEN)
     render_closing(out)
 
-    print(f"Rendered 8 frames to {out}/")
+    print(f"Rendered 11 frames to {out}/")
     for p in sorted(out.glob("*.png")):
         print(f"  - {p.name} ({p.stat().st_size} bytes)")
     return 0
