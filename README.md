@@ -48,7 +48,7 @@ bun install
 bun test
 ```
 
-Expected: **99 passing, 0 failing**, suite completes in ~1.3 seconds. Includes contract tests for the Splunk MCP proxy, HEC audit emitter (timeout + missing-token branches), the 4 adaptive immunity organs, and the generative stance field.
+Expected: **102 passing, 0 failing**, suite completes in ~1.6 seconds. Includes contract tests for the Splunk MCP proxy, HEC audit emitter (timeout + missing-token branches), Splunk-hosted Foundation AI Security hedging, the 4 adaptive immunity organs, and the generative stance field.
 
 ### 2. Adaptive immunity + stance field run end-to-end (60 seconds)
 
@@ -117,7 +117,7 @@ Every response carries a signed **Aegis Receipt** — a JSON envelope showing wh
 
 This single error class (`credit_balance_too_low`) is what brings down most LLM apps the moment a credit card expires. Aegis is the first agent runtime to handle it.
 
-## Demo scenarios (5/23-25 recording)
+## Demo scenarios
 
 | # | Failure injected | Layers that fire | Visible UX |
 |---|---|---|---|
@@ -128,20 +128,24 @@ This single error class (`credit_balance_too_low`) is what brings down most LLM 
 | E | All providers fail | L5 graceful contract + apologetic UX | Honest "I can't right now, but here's why" |
 | F | Shadow chaos | L6 background drill | Receipt: `last_chaos_survival: 47s ago` |
 
-All scenarios use [Toxiproxy](https://github.com/Shopify/toxiproxy) to inject *real* network failures, not mocked errors.
+All scenarios use chaos hooks in `src/aegis/l6-chaos.ts` to simulate provider and MCP outages. See `demo/video/SYNTHETIC_FALLBACK.md` for the full run-without-live-Splunk path.
 
 ## Quick start
 
 ```bash
 bun install
 cp .env.example .env.local
-# fill in TRUEFOUNDRY_API_KEY from https://aegis-hackathon.truefoundry.cloud/
+# fill in TRUEFOUNDRY_API_KEY, SPLUNK_SESSION_TOKEN, SPLUNK_HEC_URL, SPLUNK_HEC_TOKEN
+# (see .env.example for all required variables)
 
 bun run dev
 # server: http://localhost:3000
 
 # exercise every layer in one shot
 bash examples/demo.sh
+
+# Splunk AI Assistant (SAIA) drop-in integration example
+bun run examples/saia-integration.ts
 ```
 
 `/v1/chat/completions` is OpenAI SDK-compatible (non-streaming and SSE
@@ -163,7 +167,7 @@ point `base_url` at Aegis instead of `api.openai.com`.
 
 ```bash
 bun test
-# 50 tests, 0 fail, ~150 assertions, <1s
+# 102 tests, 0 fail, 324 assertions, ~1.6s
 ```
 
 Lint / typecheck:
@@ -179,12 +183,14 @@ bun run lint && bun run typecheck
 - **LLM**: OpenAI SDK pointed at TrueFoundry AI Gateway base URL
 - **Agents**: [OpenAI Agents SDK (TypeScript)](https://openai.github.io/openai-agents-js/) for tool orchestration
 - **MCP**: [TrueFoundry MCP Gateway](https://www.truefoundry.com/mcp-gateway) for tool servers
-- **Chaos**: [Toxiproxy](https://github.com/Shopify/toxiproxy) for real network failure injection
-- **Observability**: TrueFoundry AI Monitoring (OTel-compatible) feeding the Aegis Receipt
+- **Chaos**: integrated chaos hooks in `src/aegis/l6-chaos.ts` + `src/aegis/immunity.ts` for shadow failure simulation
+- **Observability**: Splunk HEC (`aegis:chaos`, `aegis:mcp-failover` sourcetypes) feeding the Aegis Receipt
 - **Lint/format**: [Biome](https://biomejs.dev/)
 
 ## Docs
 
+- [docs/JUDGE_QUICK_VERIFY.md](./docs/JUDGE_QUICK_VERIFY.md) — shortest replay path for hackathon judges
+- [docs/SPLUNK_DASHBOARD_QUERIES.md](./docs/SPLUNK_DASHBOARD_QUERIES.md) — SPL panels for chaos and MCP failover evidence
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — full 7-layer design, invariants, and degraded behaviors
 - [docs/RECEIPT.md](./docs/RECEIPT.md) — Aegis Receipt JSON schema
 - [AGENTS.md](./AGENTS.md) — coding-agent contract (conventions, no-go list, test commands)
@@ -194,14 +200,15 @@ bun run lint && bun run typecheck
 
 | Field | Detail |
 |---|---|
-| Hackathon | [DevNetwork AI + ML Hackathon 2026](https://devnetwork-ai-ml-hack-2026.devpost.com/) |
-| Challenge | TrueFoundry "Resilient Agents" ($1,500 + $500/$200 sponsor prize) |
-| Submission deadline | 2026-05-28 PDT 10am |
+| Hackathon | [Splunk Agentic Ops Hackathon 2026](https://splunk.devpost.com/) |
+| Primary track | Best of Platform & Developer Experience ($3,000) |
+| Bonus track | Best Use of Splunk Hosted Models ($1,000) |
+| Submission deadline | 2026-06-15 09:00 PDT |
 | Team | Solo (Hokuto Torigoe) |
 
 ## Acknowledgments
 
-TrueFoundry for sponsoring the challenge and Sai Krishna (TF DevRel) for clarifying that direct Gateway integration is Criteria #1. The [LiteLLM issue #24320 thread](https://github.com/BerriAI/litellm/issues/24320) for documenting the industry-wide `credit_balance_too_low` gap that Aegis L4 closes.
+Splunk for opening the Agentic Ops Hackathon with clear judging criteria and a genuinely open-ended agentic surface. TrueFoundry for the AI Gateway substrate underneath the aegis hedge/fallback primitives. The [LiteLLM issue #24320 thread](https://github.com/BerriAI/litellm/issues/24320) for documenting the industry-wide `credit_balance_too_low` gap that became aegis L4's clearest differentiator.
 
 ## License
 
