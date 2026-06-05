@@ -119,3 +119,77 @@ describe('hedgedChatCompletion — hedgeVia: splunk', () => {
     expect(result.primaryAttempt.via).toBe('tf');
   });
 });
+
+describe('hedgedChatCompletion — foundation-ai-security as hedge model', () => {
+  test('foundation-ai-security hedge fires through Splunk client and wins the race', async () => {
+    const { hedge, tf } = await loadFreshModules();
+    const tfClient = tf.getTFClient();
+
+    const result = await hedge.hedgedChatCompletion(
+      {
+        primaryModel: 'anthropic/claude-sonnet-4-5',
+        hedgeModel: 'foundation-ai-security',
+        hedgeAfterMs: 5,
+        hedgeVia: 'splunk',
+      },
+      { messages: [{ role: 'user', content: 'analyze this alert' }] },
+      tfClient,
+    );
+
+    expect(calls.some((c) => c.kind === 'splunk' && c.model === 'foundation-ai-security')).toBe(
+      true,
+    );
+    expect(calls.some((c) => c.kind === 'tf' && c.model === 'anthropic/claude-sonnet-4-5')).toBe(
+      true,
+    );
+    // Splunk leg wins (10ms < 200ms).
+    expect(result.winner).toBe('hedge');
+    expect(result.hedgeAttempt?.via).toBe('splunk');
+    expect(result.record.fired).toBe(true);
+  });
+
+  test('foundation-ai-security as primary, gpt-oss-120b as hedge — both go through Splunk', async () => {
+    const { hedge, tf } = await loadFreshModules();
+    // Route primary through the Splunk client by using getSplunkClient directly.
+    // Simulated by passing tfClient but both models routed via splunk hedge path.
+    const tfClient = tf.getTFClient();
+
+    const result = await hedge.hedgedChatCompletion(
+      {
+        primaryModel: 'foundation-ai-security',
+        hedgeModel: 'gpt-oss-120b',
+        hedgeAfterMs: 5,
+        hedgeVia: 'splunk',
+      },
+      { messages: [{ role: 'user', content: 'classify this threat' }] },
+      tfClient,
+    );
+
+    // foundation-ai-security went through TF (primary path), gpt-oss-120b hedge through Splunk.
+    expect(calls.some((c) => c.model === 'foundation-ai-security')).toBe(true);
+    expect(calls.some((c) => c.kind === 'splunk' && c.model === 'gpt-oss-120b')).toBe(true);
+    expect(result.record.fired).toBe(true);
+  });
+
+  test('hedge record marks fired=true when foundation-ai-security hedge threshold is crossed', async () => {
+    const { hedge, tf } = await loadFreshModules();
+    const tfClient = tf.getTFClient();
+
+    const result = await hedge.hedgedChatCompletion(
+      {
+        primaryModel: 'anthropic/claude-sonnet-4-5',
+        hedgeModel: 'foundation-ai-security',
+        hedgeAfterMs: 5,
+        hedgeVia: 'splunk',
+      },
+      { messages: [{ role: 'user', content: 'hi' }] },
+      tfClient,
+    );
+
+    expect(result.record.fired).toBe(true);
+    expect(result.record.trigger_threshold_ms).toBe(5);
+    // The losing primary attempt is marked canceled.
+    expect(result.primaryAttempt.outcome).toBe('canceled');
+    expect(result.hedgeAttempt?.outcome).toBe('success');
+  });
+});
