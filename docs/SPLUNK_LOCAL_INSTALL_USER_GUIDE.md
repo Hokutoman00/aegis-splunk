@@ -21,7 +21,7 @@ Get-NetTCPConnection -State Listen -LocalPort 8000,8088,8089,9997 -ErrorAction S
 3. インストール先: default `C:\Program Files\Splunk\` で OK
 4. **Admin Account 設定**: username/password を聞かれる
    - Username: `admin` 推奨
-   - Password: **要メモ** (例 `***REDACTED***` 等。aegis-splunk env に書き込む必要あり)
+   - Password: **要メモ** (任意の強いパスワードを設定。aegis-splunk env に書き込む必要あり)
 5. SSL: default `Yes` (HTTPS)
 6. Install → 完了まで 3-5 分
 
