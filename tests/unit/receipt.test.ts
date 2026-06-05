@@ -114,6 +114,45 @@ describe('ReceiptBuilder', () => {
     expect(b2.build().layers_fired).toContain('L3');
   });
 
+  describe('trust_posture — AI Ops Trust Layer', () => {
+    test('verdict=trusted when no recovery layers fired', () => {
+      const b = new ReceiptBuilder();
+      const r = b.build();
+      expect(r.trust_posture.verdict).toBe('trusted');
+      expect(r.trust_posture.human_action).toMatch(/No recovery needed/);
+    });
+
+    test('verdict=degraded when L4 fires (recovery succeeded)', () => {
+      const b = new ReceiptBuilder();
+      b.setL4Match({
+        rule_id: 'anthropic.400.credit_balance.regex',
+        rule_source: 'default',
+        action_taken: 'fallback_provider',
+        message_class: 'credit_balance_too_low',
+      });
+      const r = b.build();
+      expect(r.trust_posture.verdict).toBe('degraded');
+      expect(r.trust_posture.human_action).toMatch(/Recovery succeeded/);
+      expect(r.trust_posture.provenance).toContain('L4');
+      expect(r.trust_posture.provenance).toContain('rule:anthropic.400.credit_balance.regex');
+    });
+
+    test('verdict=failed when l5_contract.honored=false', () => {
+      const b = new ReceiptBuilder();
+      b.setL5Contract({ budgets: {}, honored: false, degraded: true, degradation_reason: 'all_providers_failed' });
+      const r = b.build();
+      expect(r.trust_posture.verdict).toBe('failed');
+      expect(r.trust_posture.human_action).toMatch(/All providers exhausted/);
+    });
+
+    test('splunk_query embeds request_id and is valid SPL', () => {
+      const b = new ReceiptBuilder({ request_id: '01TEST123456789ABCDEFGHIJK' });
+      const r = b.build();
+      expect(r.trust_posture.splunk_query).toContain('01TEST123456789ABCDEFGHIJK');
+      expect(r.trust_posture.splunk_query).toContain('sourcetype="aegis:*"');
+    });
+  });
+
   test('build() output is JSON-serializable (no circular refs)', () => {
     const b = new ReceiptBuilder();
     b.recordProvider({

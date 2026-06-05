@@ -33,3 +33,13 @@ export interface TFHealthRecord {
   bypass_used: boolean;
   last_heartbeat_ms?: number;
 }
+
+// AI Ops Trust Layer — every Receipt carries a posture summary for operators,
+// auditors, and SOC analysts. The splunk_query field is a pre-built SPL
+// expression that locates this exact request in the Splunk index.
+export interface TrustPosture {
+  verdict: 'trusted' | 'degraded' | 'failed';
+  human_action: string;
+  splunk_query: string;
+  provenance: string[]; // rule IDs + layer names that shaped this response
+}

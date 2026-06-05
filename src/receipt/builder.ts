@@ -7,7 +7,7 @@ import type { HedgeRecord } from '../aegis/l0-hedge.js';
 import type { L4Match } from '../aegis/l4-semantic.js';
 import type { L5ContractRecord } from '../aegis/l5-contract.js';
 import type { L6ChaosRecord } from '../aegis/l6-chaos.js';
-import type { LayerFired, ProviderTry, TFHealthRecord } from '../aegis/types.js';
+import type { LayerFired, ProviderTry, TFHealthRecord, TrustPosture } from '../aegis/types.js';
 
 export interface ReceiptV0 {
   version: 'aegis-v3.0';
@@ -17,6 +17,7 @@ export interface ReceiptV0 {
   providers_tried: ProviderTry[];
   layers_fired: LayerFired[];
   cost_usd_total: number;
+  trust_posture: TrustPosture;
   l0_hedge?: HedgeRecord;
   l4_semantic?: L4Match;
   l5_contract?: L5ContractRecord;
@@ -111,6 +112,33 @@ export class ReceiptBuilder {
     return this.request_id;
   }
 
+  private buildTrustPosture(): TrustPosture {
+    const layers = [...this.layers_fired];
+    const recoveryLayers: LayerFired[] = ['L3', 'L4', 'L5'];
+    const hadRecovery = layers.some((l) => recoveryLayers.includes(l));
+    const failed = this.l5_contract?.honored === false;
+
+    const verdict: TrustPosture['verdict'] = failed
+      ? 'failed'
+      : hadRecovery
+        ? 'degraded'
+        : 'trusted';
+
+    const human_action =
+      verdict === 'failed'
+        ? 'All providers exhausted. Check Splunk dashboard and rotate credentials or wait for provider recovery.'
+        : verdict === 'degraded'
+          ? 'Recovery succeeded. Search Splunk for aegis:* events to audit which layer fired and why.'
+          : 'No recovery needed. Receipt attached for audit trail.';
+
+    const splunk_query = `index=main sourcetype="aegis:*" earliest=-1h | search request_id="${this.request_id}"`;
+
+    const provenance: string[] = [...layers];
+    if (this.l4_semantic?.rule_id) provenance.push(`rule:${this.l4_semantic.rule_id}`);
+
+    return { verdict, human_action, splunk_query, provenance };
+  }
+
   build(): ReceiptV0 {
     const out: ReceiptV0 = {
       version: 'aegis-v3.0',
@@ -120,6 +148,7 @@ export class ReceiptBuilder {
       providers_tried: [...this.providers_tried],
       layers_fired: [...this.layers_fired],
       cost_usd_total: Math.round(this.cost_usd_total * 1e6) / 1e6,
+      trust_posture: this.buildTrustPosture(),
     };
     if (this.l0_hedge) out.l0_hedge = this.l0_hedge;
     if (this.l4_semantic) out.l4_semantic = this.l4_semantic;
