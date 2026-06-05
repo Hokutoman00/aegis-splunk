@@ -32,9 +32,9 @@ Alternative if Devpost rejects the hyphen for any reason:
 
 ## Tagline (max 200 chars)
 
-**A resilience layer for Splunk's agentic stack: hedge across hosted gpt-oss-120b/20b, fall back when MCP times out, and emit every recovery as a Splunk HEC event the SOC team already watches.**
+**AI Ops Trust Layer for Splunk agents: hedge across hosted models, recover when MCP fails, and tell the analyst whether to continue, watch, degrade, or halt.**
 
-(196 chars — under the 200-char limit.)
+(157 chars — under the 200-char limit.)
 
 ---
 
@@ -64,7 +64,7 @@ depends on**, and turns provider/MCP failures into Splunk-observable recovery.
 It is OpenAI-SDK-compatible, so an existing agent only needs its `base_url`
 re-pointed - no rewrite, no SDK swap, no protocol invention.
 
-**Four capabilities:**
+**Five capabilities:**
 
 1. **Hedge across providers**, including Splunk hosted models. Parallel calls
    to Anthropic / OpenAI / Gemini and Splunk's hosted `gpt-oss-120b`,
@@ -94,14 +94,21 @@ re-pointed - no rewrite, no SDK swap, no protocol invention.
    resilience dashboard. No second tool to learn.
    (`src/aegis/splunk-audit.ts` + `src/aegis/l6-chaos.ts`)
 
+5. **AI Ops Trust Layer.** `/v1/trust/posture` converts chaos survival,
+   adaptive-immunity state, and stance-field evidence into a human-facing
+   posture: `trusted`, `watch`, `degraded`, or `halt`. The output includes the
+   human gate and the operator's next action, and the same posture is emitted
+   into Splunk as `trust_posture` on `aegis:chaos` events.
+   (`src/aegis/trust-posture.ts`)
+
 ### Three numbers
 
-- **13 TypeScript modules** across `src/aegis/`, `src/mcp/`, `src/server/`,
+- **14 TypeScript modules** across `src/aegis/`, `src/mcp/`, `src/server/`,
   `src/chaos/`, `src/receipt/`, and `src/config.ts`.
-- **68 passing tests** (`bun test`), 205 assertions, runs in ~1.2 seconds.
+- **111 passing tests** (`bun test`), 347 assertions, runs in ~1.7 seconds.
   Includes contract tests for the Splunk hosted-models provider, the HEC
-  emitter (including timeout + missing-token degradation), and the MCP proxy
-  REST shim.
+  emitter (including timeout + missing-token degradation), Foundation AI
+  Security hedge routing, and the MCP proxy REST shim.
 - **Splunk MCP + Splunk hosted models + Splunk HEC, all three integrated.**
   Not "we depend on one Splunk surface and the rest is generic" - every
   Splunk-native surface in the agentic ops stack has a corresponding
@@ -114,7 +121,8 @@ re-pointed - no rewrite, no SDK swap, no protocol invention.
   need to be rewritten to gain resilience. The Aegis Receipt JSON envelope
   attached to every response gives developers a single artifact that names
   every layer that fired, every provider tried, and how long ago aegis-splunk
-  last survived a chaos drill.
+  last survived a chaos drill. The Trust Layer adds the human gate: continue,
+  watch, approve degraded mode, or stop and review.
 
 - **Bonus track: Best Use of Splunk Hosted Models.** `gpt-oss-120b`,
   `gpt-oss-20b`, and Foundation AI Security are first-class providers in the
@@ -126,26 +134,26 @@ re-pointed - no rewrite, no SDK swap, no protocol invention.
 
 ### How aegis-splunk satisfies the four Splunk Agentic Ops judging criteria
 
-- **Technological Implementation.** 13 TypeScript modules, 68 passing tests,
+- **Technological Implementation.** 14 TypeScript modules, 111 passing tests,
   `bash demo/run-demo.sh` is the single-command reproducer. The hedge layer,
-  MCP proxy + REST shim, and HEC audit emitter compose end-to-end and can be
-  exercised on a local Splunk Enterprise trial.
+  MCP proxy + REST shim, HEC audit emitter, and AI Ops Trust Layer compose
+  end-to-end and can be exercised on a local Splunk Enterprise trial.
 
 - **Design.** Drop-in OpenAI-SDK-compatible base URL means existing agents do
-  not need to be rewritten. The dashboard makes hedge wins and MCP failovers
-  visible in the same Splunk index the SOC analyst is already watching.
+  not need to be rewritten. The dashboard makes hedge wins, MCP failovers, and
+  trust posture visible in the same Splunk index the SOC analyst is already
+  watching.
 
 - **Potential Impact.** Every major LLM provider has had a multi-hour outage
   in the past 12 months. Agentic AI in security operations means an LLM blink
   during a P1 incident is now a security incident in its own right.
-  aegis-splunk keeps the agent provably alive across the outage and emits the
-  recovery as an observable Splunk event.
+  aegis-splunk keeps the agent provably alive across the outage and tells the
+  analyst whether to continue, watch, degrade, or halt.
 
 - **Quality of the Idea.** The chaos-verification trace IS the Splunk
-  observability artifact - not a side channel. The SOC team learns one tool,
-  not two. Hedge + fallback + chaos primitives are SRE patterns (Jeff Dean's
-  "Tail at Scale", Netflix Simian Army) imported into the agentic LLM stack
-  via a Splunk-native surface.
+  observability artifact - not a side channel. The Trust Layer turns Splunk
+  into the place where humans root trust in agentic AI. The SOC team learns
+  one tool, not two.
 
 ### Disclosure
 
@@ -159,6 +167,7 @@ Hackathon 2026. The **Splunk-specific work is new for this hackathon**:
 - HEC audit-log emission with `aegis:chaos` and `aegis:mcp-failover`
   sourcetypes (`src/aegis/splunk-audit.ts`)
 - Chaos engine Splunk integration (HEC delivery of drill outcomes)
+- AI Ops Trust Layer (`src/aegis/trust-posture.ts`, `/v1/trust/posture`)
 - The SOC-P1 demo scenario over Splunk telemetry (`demo/`)
 - This repository's architecture (`ARCHITECTURE.md`)
 
@@ -175,9 +184,10 @@ policy confirmed via `#splunk-ai-hackathon` Slack before submitting.
 - **Hosted models**: Splunk gpt-oss-120b / gpt-oss-20b / Foundation AI Security
   via Splunk's OpenAI-compatible chat-completions surface on the management port
 - **Observability**: Splunk HEC (sourcetypes `aegis:chaos` + `aegis:mcp-failover`)
+- **Trust posture**: `src/aegis/trust-posture.ts` + `/v1/trust/posture`
 - **Validation**: Zod at every external boundary
 - **Lint/format**: Biome
-- **Tests**: Bun's built-in runner - 68 tests, 205 assertions, ~1.2 seconds
+- **Tests**: Bun's built-in runner - 111 tests, 347 assertions, ~1.7 seconds
 
 ### Challenges we ran into
 
@@ -250,16 +260,17 @@ checkbox for **Best Use of Splunk Hosted Models** exists, check that too.
 | Devpost field | Value |
 |---|---|
 | GitHub | <https://github.com/Hokutoman00/aegis-splunk> |
-| Video | `<TBD - YouTube unlisted link goes here after recording>` |
+| Video | https://youtu.be/EhCKT7-h5ro |
 
-The video URL will be the YouTube unlisted upload of the 3-minute SOC-P1
-scenario recording. See `docs/SUBMIT-CHECKLIST.md` for the upload procedure.
+Demo video: 2:55, unlisted, 9-scene synthetic walkthrough. Covers L4 semantic
+fallback, gpt-oss-120b hedge, MCP REST shim failover, trust_posture transitions,
+HEC events indexed, and MTTR receipt.
 
 ---
 
 ## Required artifacts (the four things judges will look for)
 
-1. **Architecture diagram**: `ARCHITECTURE.md` at the repo root - Mermaid
+1. **Architecture diagram**: `architecture_diagram.md` at the repo root - Mermaid
    `flowchart LR` covering Agent -> aegis-splunk middleware -> LLM Providers
    (including Splunk hosted) + Splunk MCP layer + Splunk Observability (HEC,
    indexes, dashboard). Yellow nodes are Splunk-native, blue is the agent,
@@ -269,10 +280,16 @@ scenario recording. See `docs/SUBMIT-CHECKLIST.md` for the upload procedure.
    has the 7-layer table, the demo scenario table (A-F), quick-start, and
    `bun test` instructions.
 
-3. **License**: MIT, in `LICENSE` at the repo root, detected by GitHub on the
+3. **Judge quick verify**: `docs/JUDGE_QUICK_VERIFY.md` gives judges the
+   shortest replay path, `docs/JUDGE_SCORECARD.md` maps the evidence to a
+   strict 93/100 self-evaluation, `docs/AI_OPS_TRUST_LAYER.md` explains the
+   Grand Prize concept extension, and `docs/SPLUNK_DASHBOARD_QUERIES.md` gives
+   the SPL panels for `aegis:chaos` and `aegis:mcp-failover` evidence.
+
+4. **License**: MIT, in `LICENSE` at the repo root, detected by GitHub on the
    repo landing page.
 
-4. **One-command reproducer**: `bash demo/run-demo.sh` brings up the server,
+5. **One-command reproducer**: `bash demo/run-demo.sh` brings up the server,
    the chaos cascade, and the agent client in deterministic order. Detailed
    operator setup in `demo/README.md`.
 
