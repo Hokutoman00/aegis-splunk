@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { AntibodyCatalog, AutoimmuneGuard, buildSignature, TCellMemory } from './immunity.js';
+import { AntibodyCatalog, AutoimmuneGuard, TCellMemory, buildSignature } from './immunity.js';
 import {
   CATALOG_STANCE,
-  catalogOpinion,
   GUARD_STANCE,
-  guardOpinion,
   INITIAL_STANCES,
-  memoryOpinion,
   MEMORY_STANCE,
-  runStanceField,
   SCHEDULER_STANCE,
+  catalogOpinion,
+  guardOpinion,
+  memoryOpinion,
+  runStanceField,
   schedulerOpinion,
 } from './stances.js';
 import type { ProviderError } from './types.js';
@@ -40,10 +40,10 @@ describe('individual stance opinions', () => {
     expect(opNovel.from_stance).toBe(CATALOG_STANCE.organ);
     expect(opNovel.claim).not.toBeNull();
     // mark all candidates as known
-    ctx.candidates.forEach((c) => {
+    for (const c of ctx.candidates) {
       const sig = buildSignature('p', mkErr(), c.scenario);
       ctx.catalog.record({ ...sig, sig_id: c.sig_id });
-    });
+    }
     const opKnown = catalogOpinion(ctx);
     expect(opKnown.claim).toBeNull(); // abstention/refusal
     expect(opKnown.justification).toContain('Catalog perspective');
@@ -109,12 +109,12 @@ describe('stance field iteration (A-plan core)', () => {
   test('emerged stances appear when tensions are present', () => {
     const ctx = freshCtx();
     // Set up a Catalog-Memory tension: catalog full of knowns, memory has low conf
-    ctx.candidates.forEach((c) => {
+    for (const c of ctx.candidates) {
       const sig = buildSignature('p', mkErr(), c.scenario);
       ctx.catalog.record({ ...sig, sig_id: c.sig_id });
       ctx.memory.remember(c.sig_id, 'x', true, true);
       ctx.memory.remember(c.sig_id, 'x', true, false); // conf=0.5
-    });
+    }
     const field = runStanceField(ctx);
     expect(field.all_stances.length).toBeGreaterThanOrEqual(4);
     // Emerged Auditor or similar should appear given the tension

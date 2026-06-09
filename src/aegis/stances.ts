@@ -103,15 +103,15 @@ export interface DrillDecisionContext<S> {
   guard: AutoimmuneGuard;
 }
 
-export function catalogOpinion<S>(
-  ctx: DrillDecisionContext<S>,
-): Opinion<DrillCandidate<S>> {
+export function catalogOpinion<S>(ctx: DrillDecisionContext<S>): Opinion<DrillCandidate<S>> {
   const unknown = ctx.candidates.filter((c) => !ctx.catalog.isKnown(c.sig_id, 6 * 3600));
   if (unknown.length > 0) {
+    const claim = unknown[0];
+    if (!claim) throw new Error('expected at least one unknown drill candidate');
     return {
       from_stance: CATALOG_STANCE.organ,
       decision_target: 'next_drill',
-      claim: unknown[0]!,
+      claim,
       justification: `${unknown.length} novel signatures present; preserve immune budget by drilling unknowns first.`,
       confidence: 0.8,
     };
@@ -120,14 +120,13 @@ export function catalogOpinion<S>(
     from_stance: CATALOG_STANCE.organ,
     decision_target: 'next_drill',
     claim: null,
-    justification: 'All candidates are known. Catalog perspective: no inoculation justified — re-drill is waste.',
+    justification:
+      'All candidates are known. Catalog perspective: no inoculation justified — re-drill is waste.',
     confidence: 0.6,
   };
 }
 
-export function schedulerOpinion<S>(
-  ctx: DrillDecisionContext<S>,
-): Opinion<DrillCandidate<S>> {
+export function schedulerOpinion<S>(ctx: DrillDecisionContext<S>): Opinion<DrillCandidate<S>> {
   // Pick by maximum information-gain heuristic. Independent of Catalog's
   // "known" judgment — we apply our own time-decay over freshness.
   if (ctx.candidates.length === 0) {
@@ -151,18 +150,25 @@ export function schedulerOpinion<S>(
     }
     if (!best || score > best.score) best = { c, score };
   }
+  if (!best) {
+    return {
+      from_stance: SCHEDULER_STANCE.organ,
+      decision_target: 'next_drill',
+      claim: null,
+      justification: 'No candidate scored.',
+      confidence: 1.0,
+    };
+  }
   return {
     from_stance: SCHEDULER_STANCE.organ,
     decision_target: 'next_drill',
-    claim: best!.c,
-    justification: `Maximum information gain pick (score=${best!.score.toFixed(2)}).`,
-    confidence: Math.min(1, best!.score / 4),
+    claim: best.c,
+    justification: `Maximum information gain pick (score=${best.score.toFixed(2)}).`,
+    confidence: Math.min(1, best.score / 4),
   };
 }
 
-export function guardOpinion<S>(
-  ctx: DrillDecisionContext<S>,
-): Opinion<DrillCandidate<S>> {
+export function guardOpinion<S>(ctx: DrillDecisionContext<S>): Opinion<DrillCandidate<S>> {
   const status = ctx.guard.status();
   if (!status.enabled) {
     return {
@@ -192,9 +198,7 @@ export function guardOpinion<S>(
   };
 }
 
-export function memoryOpinion<S>(
-  ctx: DrillDecisionContext<S>,
-): Opinion<DrillCandidate<S>> {
+export function memoryOpinion<S>(ctx: DrillDecisionContext<S>): Opinion<DrillCandidate<S>> {
   // Prefer candidates whose memory entry has low confidence (consolidation need).
   let best: { c: DrillCandidate<S>; conf: number } | undefined;
   for (const c of ctx.candidates) {
@@ -237,7 +241,14 @@ function findStanceOpinions(field: Opinion[], organ: string): Opinion | undefine
 export function catalogProposes(field: Opinion[], existingNames: Set<string>): Stance | null {
   const sched = findStanceOpinions(field, SCHEDULER_STANCE.organ);
   const guard = findStanceOpinions(field, GUARD_STANCE.organ);
-  if (sched && guard && sched.confidence > 0.7 && guard.confidence > 0.7 && sched.claim && guard.claim === null) {
+  if (
+    sched &&
+    guard &&
+    sched.confidence > 0.7 &&
+    guard.confidence > 0.7 &&
+    sched.claim &&
+    guard.claim === null
+  ) {
     const name = 'Curator';
     if (existingNames.has(name)) return null;
     return {

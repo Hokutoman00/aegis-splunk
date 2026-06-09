@@ -139,7 +139,12 @@ describe('ReceiptBuilder', () => {
 
     test('verdict=failed when l5_contract.honored=false', () => {
       const b = new ReceiptBuilder();
-      b.setL5Contract({ budgets: {}, honored: false, degraded: true, degradation_reason: 'all_providers_failed' });
+      b.setL5Contract({
+        budgets: {},
+        honored: false,
+        degraded: true,
+        degradation_reason: 'all_providers_failed',
+      });
       const r = b.build();
       expect(r.trust_posture.verdict).toBe('failed');
       expect(r.trust_posture.human_action).toMatch(/All providers exhausted/);

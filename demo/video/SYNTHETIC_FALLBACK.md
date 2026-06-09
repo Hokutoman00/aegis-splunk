@@ -117,8 +117,8 @@ What is mocked:
   Gateway -> Anthropic/OpenAI/Splunk hosted, but it needs a real TF token)
 
 What is **identical** to the live path:
-- All 13 TypeScript modules in `src/`
-- All 68 tests pass (`bun test`)
+- All 14 TypeScript modules in `src/`
+- All 111 tests pass (`bun test`)
 - The request flow: agent -> L0 hedge -> L4 semantic -> L5 contract ->
   receipt
 - The MCP flow: classifier -> hedge -> mock-caller (live: -> splunk-proxy

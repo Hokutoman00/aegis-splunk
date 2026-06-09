@@ -57,7 +57,7 @@ Every response carries an **Aegis Receipt** — a signed JSON envelope with the 
 - **Chaos**: `toxiproxy-node-client` for network-level fault injection
 - **Validation**: Zod at every external boundary
 - **Lint/format**: Biome
-- **Tests**: Bun's built-in runner — 50 unit tests, 148 assertions, runs in ~700ms
+- **Tests**: Bun's built-in runner — 111 tests, 347 assertions, runs in ~1.7s
 
 ### Challenges we ran into
 
@@ -71,7 +71,7 @@ Every response carries an **Aegis Receipt** — a signed JSON envelope with the 
 - **A genuine industry-gap fix.** Aegis L4 is the first agent runtime we know of that handles `credit_balance_too_low` — a known unsolved problem documented across LiteLLM, Portkey, and OpenRouter issue trackers.
 - **Hedge for LLMs, properly.** Jeff Dean's 1992-vintage "Tail at Scale" hedging adapted to LLM calls with cost-aware cancellation and a verifiable cost-vs-latency receipt.
 - **TF is not a SPOF for Aegis.** Even the gateway we depend on has a bypass path. Most "TF-on-top" agents would die when TF dies; Aegis routes around it.
-- **50 tests / 0 fail / ~700ms.** Real production-grade test discipline, not a sketch.
+- **111 tests / 0 fail / 347 assertions.** Real production-grade test discipline, not a sketch.
 
 ### What we learned
 

@@ -16,11 +16,13 @@ flowchart LR
         F[L4 Semantic Fallback<br/>catches credit_balance_too_low]
         M[MCP Proxy<br/>primary → REST shim]
         C[L6 Chaos Engine<br/>shadow drills]
+        T[AI Ops Trust Layer<br/>/v1/trust/posture]
         AU[Splunk Audit Emitter<br/>aegis:chaos / aegis:mcp-failover]
         H --> F
         F --> AU
         M --> AU
-        C --> AU
+        C --> T
+        T --> AU
     end
 
     subgraph Providers[" LLM Providers (hedge / fallback chain)  "]
@@ -40,7 +42,7 @@ flowchart LR
 
     subgraph SplunkObs[" Splunk Observability  "]
         HEC[HEC ingest]
-        DB[(aegis-splunk-demo<br/>Dashboard)]
+        DB[(aegis-splunk-demo<br/>Dashboard + trust posture)]
         IDX[(Splunk indexes)]
         HEC --> IDX
         IDX --> DB
@@ -74,13 +76,15 @@ Yellow nodes are Splunk-native surfaces (MCP server, hosted models, HEC, dashboa
 3. **L4 Semantic Fallback** inspects errors the gateway didn't catch (e.g. `400 credit_balance_too_low`) and reclassifies them as fallback-eligible.
 4. The agent's tool calls travel through the **MCP Proxy** to the official Splunk MCP Server.
 5. Each step's outcome is recorded in the **Aegis Receipt** (JSON envelope returned alongside the response).
+6. The **AI Ops Trust Layer** converts chaos, immunity, and stance-field evidence into a human-readable trust posture (`trusted`, `watch`, `degraded`, or `halt`).
 
 ## Request flow (failure → recovery)
 
 1. Primary provider (Anthropic) returns `429` or `400 credit_balance_too_low`.
 2. L0 hedge has already fired to a backup (e.g. **Splunk-hosted `gpt-oss-120b`**) when the primary slowed. The Splunk-hosted response wins.
 3. Splunk MCP Server returns `503` on the next tool call. MCP Proxy classifies the outcome and switches to the **REST fallback shim**, which talks directly to `/services/search/jobs` on the same Splunk instance with the cached session token.
-4. The **Splunk Audit Emitter** posts a structured event to HEC with `sourcetype=aegis:mcp-failover` (and `aegis:chaos` for chaos engine drills). The SOC analyst sees the failover land in the same Splunk index they were already watching.
+4. The **AI Ops Trust Layer** decides whether the operator can continue, should watch, must approve degraded mode, or should stop and review.
+5. The **Splunk Audit Emitter** posts a structured event to HEC with `sourcetype=aegis:mcp-failover` (and `aegis:chaos` for chaos engine drills). The SOC analyst sees the failover and trust posture land in the same Splunk index they were already watching.
 
 ## Splunk-specific integration surface
 
@@ -91,6 +95,7 @@ Yellow nodes are Splunk-native surfaces (MCP server, hosted models, HEC, dashboa
 | **Splunk HEC** (`SPLUNK_HEC_URL` + token) | `src/aegis/splunk-audit.ts` | Best-effort ingest of `aegis:chaos` and `aegis:mcp-failover` events; errors swallowed so audit pipeline never takes down the request path |
 | **Splunk search REST** (`/services/search/jobs?exec_mode=oneshot`) | `src/mcp/splunk-proxy.ts` REST shim | Fallback for `splunk_search` tool when the MCP server is unavailable |
 | **Splunk dashboard** (`aegis-splunk-demo`) | `demo/seed-data/` + dashboard XML | Visualizes hedge wins, MCP failovers, MTTR; consumed by the SOC analyst during the demo |
+| **AI Ops Trust Layer** | `src/aegis/trust-posture.ts`, `GET /v1/trust/posture` | Turns Splunk-observable recovery evidence into a human-in-the-loop operating posture |
 
 ## File layout (Splunk-specific)
 
@@ -102,6 +107,7 @@ aegis-splunk/
 │   ├── aegis/
 │   │   ├── splunk-client.ts                ← Splunk hosted-models provider
 │   │   ├── splunk-audit.ts                 ← HEC emitter
+│   │   ├── trust-posture.ts                ← AI Ops trust posture
 │   │   ├── l0-hedge.ts                     ← extended with hedgeVia: 'splunk'
 │   │   ├── (existing layers L1-L6, tf-client, direct-client, types, receipt builder)
 │   └── mcp/
@@ -122,14 +128,14 @@ aegis-splunk/
 │   ├── DEMO-SCRIPT.md                      ← extended demo screenplay
 │   ├── SUBMISSION.md                       ← Splunk Agentic Ops submission notes
 │   └── SUBMIT-CHECKLIST.md                 ← pre-submit verification list
-└── tests/                                  ← 68 passing tests (Bun)
+└── tests/                                  ← 111 passing tests (Bun)
 ```
 
 The detailed per-layer specification (L0–L6 invariants, monitors, degraded behaviors, MCP READ_HEDGE vs WRITE_TIED classification) lives in [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md). The Receipt JSON schema is in [docs/RECEIPT.md](./docs/RECEIPT.md).
 
 ## How aegis-splunk satisfies the four Splunk Agentic Ops judging criteria
 
-- **Technological Implementation.** 13 TypeScript modules, 68 passing tests, `bun run demo/run-demo.sh` is the single-command reproducer; the hedge layer, MCP proxy + REST shim, and HEC audit emitter compose end-to-end and can be exercised on a local Splunk Enterprise trial.
-- **Design.** Drop-in OpenAI-SDK-compatible base URL means an existing agent does not need to be rewritten to gain resilience. The dashboard makes hedge wins and MCP failovers visible in the same Splunk index the SOC analyst is already watching.
-- **Potential Impact.** Every major LLM provider has had a multi-hour outage in the past 12 months. Agentic AI in security operations means an LLM blink during a P1 incident is now a security incident in its own right. aegis-splunk keeps the agent provably alive across the outage and emits the recovery as an observable Splunk event.
-- **Quality of the Idea.** The chaos-verification trace IS the Splunk observability artifact — not a side channel. The SOC team learns one tool, not two. Hedge + fallback + chaos primitives are SRE patterns (Jeff Dean's "Tail at Scale", Netflix Simian Army) imported into the agentic LLM stack via a Splunk-native surface.
+- **Technological Implementation.** 14 TypeScript modules, 111 passing tests, `bun run demo/run-demo.sh` is the single-command reproducer; the hedge layer, MCP proxy + REST shim, HEC audit emitter, and Trust Layer compose end-to-end and can be exercised on a local Splunk Enterprise trial.
+- **Design.** Drop-in OpenAI-SDK-compatible base URL means an existing agent does not need to be rewritten to gain resilience. The dashboard makes hedge wins, MCP failovers, and trust posture visible in the same Splunk index the SOC analyst is already watching.
+- **Potential Impact.** Every major LLM provider has had a multi-hour outage in the past 12 months. Agentic AI in security operations means an LLM blink during a P1 incident is now a security incident in its own right. aegis-splunk keeps the agent provably alive across the outage and tells the operator whether to continue, watch, degrade, or halt.
+- **Quality of the Idea.** The chaos-verification trace IS the Splunk observability artifact — not a side channel. The Trust Layer turns Splunk into the place where humans root trust in agentic AI. The SOC team learns one tool, not two.

@@ -34,7 +34,12 @@ export interface FailureSignature {
   drill_count: number;
 }
 
-function signatureHash(target: string, status: number | undefined, errClass: string, msgPattern: string): string {
+function signatureHash(
+  target: string,
+  status: number | undefined,
+  errClass: string,
+  msgPattern: string,
+): string {
   return createHash('sha256')
     .update(`${target}|${status ?? 'na'}|${errClass}|${msgPattern}`)
     .digest('hex')
@@ -45,7 +50,11 @@ function normalizeMessage(raw: string): string {
   return raw.toLowerCase().replace(/\s+/g, ' ').slice(0, 80).trim();
 }
 
-export function buildSignature(target: string, err: ProviderError, errClass: string): FailureSignature {
+export function buildSignature(
+  target: string,
+  err: ProviderError,
+  errClass: string,
+): FailureSignature {
   const msgPattern = normalizeMessage(err.raw_message ?? '');
   const now = new Date().toISOString();
   return {
@@ -121,7 +130,12 @@ export class TCellMemory {
   }
 
   /** Record a classification outcome. Hit = classification matched; Miss = it didn't. */
-  remember(sigId: string, errorClass: string, fallbackEligible: boolean, hit: boolean): TCellMemoryEntry {
+  remember(
+    sigId: string,
+    errorClass: string,
+    fallbackEligible: boolean,
+    hit: boolean,
+  ): TCellMemoryEntry {
     let entry = this.memory.get(sigId);
     if (!entry) {
       entry = {

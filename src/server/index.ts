@@ -11,9 +11,10 @@ import type OpenAI from 'openai';
 import { hedgedChatCompletion } from '../aegis/l0-hedge.js';
 import { classifyError, pickFallbackTarget } from '../aegis/l4-semantic.js';
 import { buildGracefulResponse } from '../aegis/l5-contract.js';
-import { getChaosState, startChaosScheduler } from '../aegis/l6-chaos.js';
+import { buildStanceField, getChaosState, startChaosScheduler } from '../aegis/l6-chaos.js';
 import { getDefaultVirtualModel, getTFClient } from '../aegis/tf-client.js';
 import { callWithSpofBypass, isInfrastructureError } from '../aegis/tf-spof.js';
+import { buildTrustPosture } from '../aegis/trust-posture.js';
 import type { ProviderError } from '../aegis/types.js';
 import { getEnv } from '../config.js';
 import { ReceiptBuilder } from '../receipt/builder.js';
@@ -48,6 +49,10 @@ app.get('/health', (c) => {
 // configured Virtual Model. Aegis adds: Receipt construction (always), and in
 // subsequent commits L0 hedge, L4 semantic error, L5 contract, L6 chaos.
 app.get('/v1/chaos/status', (c) => c.json(getChaosState()));
+app.get('/v1/trust/posture', (c) => {
+  const chaos = getChaosState();
+  return c.json(buildTrustPosture({ chaos, stanceField: buildStanceField() }));
+});
 
 // MCP tool execution with classification-aware resilience.
 // POST /v1/mcp/call

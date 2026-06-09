@@ -59,12 +59,12 @@ async function loadFreshModules(): Promise<{
   tf: typeof import('../../src/aegis/tf-client.js');
 }> {
   const stamp = `${Date.now()}-${Math.random()}`;
-  const hedge = (await import(
+  const hedge: typeof import('../../src/aegis/l0-hedge.js') = await import(
     `../../src/aegis/l0-hedge.ts?t=${stamp}`
-  )) as typeof import('../../src/aegis/l0-hedge.js');
-  const tf = (await import(
+  );
+  const tf: typeof import('../../src/aegis/tf-client.js') = await import(
     `../../src/aegis/tf-client.ts?t=${stamp}`
-  )) as typeof import('../../src/aegis/tf-client.js');
+  );
   // Force the splunk-client singleton to re-init under the test env too.
   await import(`../../src/aegis/splunk-client.ts?t=${stamp}`);
   return { hedge, tf };

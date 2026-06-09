@@ -96,10 +96,7 @@ describe('forwardMCPCall', () => {
     const fetchImpl = (async () =>
       new Response('boom', { status: 503 })) as unknown as typeof fetch;
 
-    const res = await forwardMCPCall(
-      { tool_name: 'splunk_indexes', args: {} },
-      { fetchImpl },
-    );
+    const res = await forwardMCPCall({ tool_name: 'splunk_indexes', args: {} }, { fetchImpl });
 
     expect(res.primary_outcome).toBe('http_5xx');
     expect(res.fallback_used).toBe(false);

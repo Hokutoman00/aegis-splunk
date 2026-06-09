@@ -4,7 +4,7 @@
 [![Track](https://img.shields.io/badge/Track-Platform_%26_Developer_Experience-blue)](https://splunk.devpost.com/details/prizes)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-> **Hedge first, fallback second, continuously chaos-verified — for agents that run on top of Splunk.**
+> **Hedge first, fallback second, continuously chaos-verified, trust-rooted in Splunk — for agents that run on top of Splunk.**
 
 ## The scenario judges will recognize
 
@@ -20,6 +20,7 @@ Most "resilient" AI gateways — LiteLLM, OpenRouter, Portkey, even TrueFoundry'
 - **Fallback chain that catches what gateways miss**: an L4 semantic layer reclassifies provider errors like `credit_balance_too_low` as fallback-eligible, so the agent never silently breaks on a non-standard 4xx.
 - **MCP failover for Splunk MCP Server**: aegis-splunk proxies the official Splunk MCP Server (Splunkbase #7931). On primary timeout or 5xx it transparently fails over to a thin REST-backed shim that exposes the same tool surface against Splunk's `/services/search/jobs`.
 - **Continuous chaos verification, exported to Splunk**: a chaos engine periodically simulates provider and MCP outages **in shadow** and emits a structured audit event per drill. The audit log is ingested into Splunk via HEC (sourcetype `aegis:chaos`); the chaos verification trace IS the Splunk observability artifact.
+- **AI Ops Trust Layer**: `/v1/trust/posture` turns chaos survival, adaptive-immunity state, and stance-field evidence into a human-facing posture: `trusted`, `watch`, `degraded`, or `halt`.
 - **One-line agent config**: drop-in OpenAI-SDK-compatible base URL. Existing agents do not need to be rewritten.
 
 [ARCHITECTURE.md](./ARCHITECTURE.md) shows how aegis-splunk composes with Splunk MCP Server, Splunk hosted models, and the external providers.
@@ -48,7 +49,7 @@ bun install
 bun test
 ```
 
-Expected: **102 passing, 0 failing**, suite completes in ~1.6 seconds. Includes contract tests for the Splunk MCP proxy, HEC audit emitter (timeout + missing-token branches), Splunk-hosted Foundation AI Security hedging, the 4 adaptive immunity organs, and the generative stance field.
+Expected: **111 passing, 0 failing**, suite completes in ~1.7 seconds. Includes contract tests for the Splunk MCP proxy, HEC audit emitter (timeout + missing-token branches), Splunk-hosted Foundation AI Security hedging, the 4 adaptive immunity organs, the generative stance field, and the AI Ops Trust Layer.
 
 ### 2. Adaptive immunity + stance field run end-to-end (60 seconds)
 
@@ -75,6 +76,21 @@ index=main sourcetype="aegis:*" earliest=-10m
 ```
 
 You should see the 3 events indexed, plus a stance-field snapshot field showing which initial stances voted and which emerged stances surfaced.
+
+### 4. Trust posture says what the human should do next (30 seconds)
+
+```bash
+bun run dev
+curl -sS http://localhost:3000/v1/trust/posture
+```
+
+Expected: a JSON posture with `level`, `score`, `human_gate`, `operator_next_action`, and evidence from chaos, immunity, and the stance field.
+
+Offline replay without starting the server:
+
+```bash
+bun run trust:demo
+```
 
 ### What the "refused to collapse" claim looks like in code
 
@@ -162,12 +178,13 @@ point `base_url` at Aegis instead of `api.openai.com`.
 | `POST` | `/v1/mcp/classify` | classify a tool name (READ_HEDGE / WRITE_TIED / UNKNOWN_TIED) |
 | `POST` | `/v1/mcp/call` | execute a tool with classification-aware resilience |
 | `GET` | `/v1/chaos/status` | latest L6 chaos drill outcome |
+| `GET` | `/v1/trust/posture` | AI Ops trust posture for the current agent runtime |
 
 ### Tests
 
 ```bash
 bun test
-# 102 tests, 0 fail, 324 assertions, ~1.6s
+# 111 tests, 0 fail, 347 assertions, ~1.7s
 ```
 
 Lint / typecheck:
@@ -184,12 +201,15 @@ bun run lint && bun run typecheck
 - **Agents**: [OpenAI Agents SDK (TypeScript)](https://openai.github.io/openai-agents-js/) for tool orchestration
 - **MCP**: [TrueFoundry MCP Gateway](https://www.truefoundry.com/mcp-gateway) for tool servers
 - **Chaos**: integrated chaos hooks in `src/aegis/l6-chaos.ts` + `src/aegis/immunity.ts` for shadow failure simulation
+- **Trust Layer**: `src/aegis/trust-posture.ts` turns recovery evidence into a human-in-the-loop operating posture
 - **Observability**: Splunk HEC (`aegis:chaos`, `aegis:mcp-failover` sourcetypes) feeding the Aegis Receipt
 - **Lint/format**: [Biome](https://biomejs.dev/)
 
 ## Docs
 
 - [docs/JUDGE_QUICK_VERIFY.md](./docs/JUDGE_QUICK_VERIFY.md) — shortest replay path for hackathon judges
+- [docs/JUDGE_SCORECARD.md](./docs/JUDGE_SCORECARD.md) — strict self-evaluation, evidence map, and remaining risks
+- [docs/AI_OPS_TRUST_LAYER.md](./docs/AI_OPS_TRUST_LAYER.md) — Grand Prize concept extension: trust posture rooted in Splunk evidence
 - [docs/SPLUNK_DASHBOARD_QUERIES.md](./docs/SPLUNK_DASHBOARD_QUERIES.md) — SPL panels for chaos and MCP failover evidence
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — full 7-layer design, invariants, and degraded behaviors
 - [docs/RECEIPT.md](./docs/RECEIPT.md) — Aegis Receipt JSON schema

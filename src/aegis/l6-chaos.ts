@@ -10,17 +10,18 @@
 // replace synthetic drills with Toxiproxy-injected real HTTP failures and
 // run the full /v1/chat/completions path in a shadow request.
 
-import { classifyError } from './l4-semantic.js';
 import {
   AntibodyCatalog,
   AutoimmuneGuard,
-  buildSignature,
   type DrillCandidate,
-  pickNextDrill,
   TCellMemory,
+  buildSignature,
+  pickNextDrill,
 } from './immunity.js';
+import { classifyError } from './l4-semantic.js';
 import { emitHECEvent } from './splunk-audit.js';
 import { type StanceFieldResult, runStanceField } from './stances.js';
+import { buildTrustPosture } from './trust-posture.js';
 import type { ProviderError } from './types.js';
 
 export type ChaosOutcomeKind = 'survived' | 'degraded' | 'failed';
@@ -93,7 +94,10 @@ export function runDrill(): ChaosOutcome | { skipped: true; reason: string } {
   //    prevented, skip until operator resets the guard.
   if (!state.guard.isEnabled()) {
     state.skippedByAutoimmune += 1;
-    return { skipped: true, reason: state.guard.status().reason_disabled ?? 'autoimmune kill-switch active' };
+    return {
+      skipped: true,
+      reason: state.guard.status().reason_disabled ?? 'autoimmune kill-switch active',
+    };
   }
 
   // 2. Inoculation scheduler: pick the highest-EIG scenario rather than
@@ -243,6 +247,7 @@ export async function runDrillAndEmit(): Promise<ChaosOutcome | { skipped: true;
   }
   // Build the stance field — refused-to-collapse multi-viewpoint output.
   const field = buildStanceField();
+  const trustPosture = buildTrustPosture({ chaos: cstate, stanceField: field });
   await emitHECEvent({
     sourcetype: 'aegis:chaos',
     event: {
@@ -256,6 +261,7 @@ export async function runDrillAndEmit(): Promise<ChaosOutcome | { skipped: true;
       drills_skipped_by_autoimmune: cstate.drills_skipped_by_autoimmune,
       total_drills: cstate.total_drills,
       survival_rate: cstate.survival_rate,
+      trust_posture: trustPosture,
       // Stance field — the multi-viewpoint offering. No `chosen`; consumers root themselves.
       stance_field: {
         refused_to_collapse: field.refused_to_collapse,

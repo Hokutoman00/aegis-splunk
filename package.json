@@ -14,7 +14,8 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "chaos:demo": "bun run src/chaos/scenarios.ts"
+    "chaos:demo": "bun run src/chaos/scenarios.ts",
+    "trust:demo": "bun run demo/trust-posture-demo.ts"
   },
   "dependencies": {
     "openai": "^5.0.0",

@@ -19,9 +19,10 @@ afterEach(() => {
 });
 
 async function loadFreshAudit(): Promise<typeof import('./splunk-audit.js')> {
-  return (await import(
+  const audit: typeof import('./splunk-audit.js') = await import(
     `./splunk-audit.ts?t=${Date.now()}-${Math.random()}`
-  )) as typeof import('./splunk-audit.js');
+  );
+  return audit;
 }
 
 describe('emitHECEvent', () => {

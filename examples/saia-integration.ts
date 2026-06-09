@@ -88,7 +88,9 @@ async function securityAnalysisTurn(alertJson: string): Promise<string> {
 async function main() {
   console.log('aegis-splunk × SAIA integration example\n');
 
-  console.log('── Turn 1: general analyst query (gpt-oss-120b primary + foundation-ai-security hedge)');
+  console.log(
+    '── Turn 1: general analyst query (gpt-oss-120b primary + foundation-ai-security hedge)',
+  );
   const turn1 = await saiaAgentTurn(
     'Alert fired: 47 failed SSH logins from 192.0.2.100 in 5 minutes. What should I check first?',
   );

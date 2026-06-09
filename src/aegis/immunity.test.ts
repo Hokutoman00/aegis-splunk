@@ -22,7 +22,9 @@ describe('AntibodyCatalog', () => {
     const first = cat.record(sig);
     expect(first.wasKnown).toBe(false);
     expect(cat.coverage()).toBe(1);
-    const second = cat.record(buildSignature('anthropic/claude-sonnet-4-5', mkErr(), 'credit_balance_too_low'));
+    const second = cat.record(
+      buildSignature('anthropic/claude-sonnet-4-5', mkErr(), 'credit_balance_too_low'),
+    );
     expect(second.wasKnown).toBe(true);
     expect(cat.coverage()).toBe(1); // still 1 distinct
     expect(second.entry.drill_count).toBe(2);
@@ -42,7 +44,9 @@ describe('AntibodyCatalog', () => {
     expect(cat.isKnown(sig.sig_id, 60)).toBe(true);
     // simulate old: poke the entry's last_seen
     const snap = cat.snapshot();
-    snap[0]!.last_seen_iso = new Date(Date.now() - 120_000).toISOString();
+    const entry = snap[0];
+    if (!entry) throw new Error('expected signature snapshot entry');
+    entry.last_seen_iso = new Date(Date.now() - 120_000).toISOString();
     expect(cat.isKnown(sig.sig_id, 60)).toBe(false);
     expect(cat.isKnown(sig.sig_id, 300)).toBe(true);
   });
@@ -101,8 +105,9 @@ describe('InoculationScheduler (pickNextDrill)', () => {
     cat.record(sigStale);
     cat.record(sigFresh);
     // age sigStale by 100 hours
-    cat.snapshot().find((e) => e.sig_id === sigStale.sig_id)!.last_seen_iso =
-      new Date(Date.now() - 100 * 3600 * 1000).toISOString();
+    const staleEntry = cat.snapshot().find((e) => e.sig_id === sigStale.sig_id);
+    if (!staleEntry) throw new Error('expected stale signature snapshot entry');
+    staleEntry.last_seen_iso = new Date(Date.now() - 100 * 3600 * 1000).toISOString();
     const candidates = [
       { scenario: 'stale', sig_id: sigStale.sig_id },
       { scenario: 'fresh', sig_id: sigFresh.sig_id },
@@ -132,15 +137,30 @@ describe('InoculationScheduler (pickNextDrill)', () => {
 describe('AutoimmuneGuard', () => {
   test('starts enabled, stays enabled while drills help more than hurt', () => {
     const g = new AutoimmuneGuard({ tripBelow: -60 });
-    g.record({ drill_id: 'd1', prevented_seconds: 30, caused_seconds: 0, timestamp: new Date().toISOString() });
-    g.record({ drill_id: 'd2', prevented_seconds: 45, caused_seconds: 5, timestamp: new Date().toISOString() });
+    g.record({
+      drill_id: 'd1',
+      prevented_seconds: 30,
+      caused_seconds: 0,
+      timestamp: new Date().toISOString(),
+    });
+    g.record({
+      drill_id: 'd2',
+      prevented_seconds: 45,
+      caused_seconds: 5,
+      timestamp: new Date().toISOString(),
+    });
     expect(g.isEnabled()).toBe(true);
     expect(g.status().net_seconds_helped).toBe(70);
   });
 
   test('trips kill-switch when drills cause more harm than they prevent', () => {
     const g = new AutoimmuneGuard({ tripBelow: -60 });
-    g.record({ drill_id: 'd1', prevented_seconds: 5, caused_seconds: 80, timestamp: new Date().toISOString() });
+    g.record({
+      drill_id: 'd1',
+      prevented_seconds: 5,
+      caused_seconds: 80,
+      timestamp: new Date().toISOString(),
+    });
     expect(g.isEnabled()).toBe(false);
     expect(g.status().reason_disabled).toContain('net impact');
   });
@@ -157,7 +177,12 @@ describe('AutoimmuneGuard', () => {
 
   test('reset() re-enables after a trip', () => {
     const g = new AutoimmuneGuard({ tripBelow: -10 });
-    g.record({ drill_id: 'x', prevented_seconds: 0, caused_seconds: 50, timestamp: new Date().toISOString() });
+    g.record({
+      drill_id: 'x',
+      prevented_seconds: 0,
+      caused_seconds: 50,
+      timestamp: new Date().toISOString(),
+    });
     expect(g.isEnabled()).toBe(false);
     g.reset();
     expect(g.isEnabled()).toBe(true);
@@ -183,7 +208,12 @@ describe('integration — catalog + scheduler + memory + autoimmune', () => {
     const sig = buildSignature('anthropic', mkErr({ status: 503 }), 'service_unavailable');
     cat.record({ ...sig, sig_id: 'sig-anthropic-503' });
     mem.remember('sig-anthropic-503', 'service_unavailable', true, true);
-    guard.record({ drill_id: 'd1', prevented_seconds: 20, caused_seconds: 0, timestamp: new Date().toISOString() });
+    guard.record({
+      drill_id: 'd1',
+      prevented_seconds: 20,
+      caused_seconds: 0,
+      timestamp: new Date().toISOString(),
+    });
     // Next pick — should now prefer one of the still-unknown
     const second = pickNextDrill(scenarios, cat);
     expect(second?.novel).toBe(true);

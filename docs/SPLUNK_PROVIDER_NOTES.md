@@ -30,7 +30,7 @@ Splunk MCP Server, Splunkbase app id **#7931**, latest release as of 2026-05. Fo
 - `src/mcp/splunk-proxy.ts` (new) — forwards MCP tool calls to `SPLUNK_MCP_URL`; on timeout / HTTP 5xx / malformed JSON / network error, falls back to REST shim (`splunk_search` → `/services/search/jobs?exec_mode=oneshot`). Emits structured audit event (request_id, tool_name, primary_outcome, fallback_used, latency_ms, error_class) to console + HEC.
 - `src/config.ts` — added `SPLUNK_MCP_URL` (default `http://localhost:8089/services/mcp`).
 - `.env.example` — `SPLUNK_MCP_URL` documented.
-- Tests: `tests/unit/splunk-hedge.test.ts`, `src/mcp/splunk-proxy.test.ts`, `src/aegis/splunk-audit.test.ts` (12 new, all passing; total bun test 68 pass / 0 fail).
+- Tests: `tests/unit/splunk-hedge.test.ts`, `src/mcp/splunk-proxy.test.ts`, `src/aegis/splunk-audit.test.ts`, and the later Foundation AI Security + Trust Layer coverage keep the current suite at 111 pass / 0 fail.
 
 ### Demo path enabled (Scene 3 from the Splunk demo plan)
 1. Anthropic returns 429 via TF → L0 hedge fires with `hedgeVia: 'splunk'` and `hedgeModel: 'gpt-oss-120b'`.

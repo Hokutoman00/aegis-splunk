@@ -23,7 +23,7 @@ describe('l6-chaos × immunity integration', () => {
     }
     // Coverage should never decrease.
     for (let i = 1; i < seen.length; i++) {
-      expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1]!);
+      expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1] ?? 0);
     }
     // After 8 drills with 4 distinct scenarios in DRILL_SCENARIOS, coverage
     // should hit the scenario-count ceiling (the scheduler exhausts novel

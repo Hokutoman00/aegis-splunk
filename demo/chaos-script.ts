@@ -26,8 +26,11 @@ interface Step {
 
 const env = getEnv();
 
-const scenarioArg = process.argv.find((a) => a.startsWith('--scenario='))?.split('=')[1] ??
-  (process.argv.includes('--scenario') ? process.argv[process.argv.indexOf('--scenario') + 1] : undefined);
+const scenarioArg =
+  process.argv.find((a) => a.startsWith('--scenario='))?.split('=')[1] ??
+  (process.argv.includes('--scenario')
+    ? process.argv[process.argv.indexOf('--scenario') + 1]
+    : undefined);
 
 if (!scenarioArg) {
   console.error('usage: bun run demo/chaos-script.ts --scenario soc-p1');
@@ -40,7 +43,10 @@ if (scenarioArg !== 'soc-p1') {
 
 let hecUnreachable = false;
 
-async function emit(event: Record<string, unknown>, sourcetype: 'aegis:chaos' | 'aegis:mcp-failover' = 'aegis:chaos'): Promise<void> {
+async function emit(
+  event: Record<string, unknown>,
+  sourcetype: 'aegis:chaos' | 'aegis:mcp-failover' = 'aegis:chaos',
+): Promise<void> {
   const result = await emitHECEvent({ sourcetype, event, source: 'aegis:chaos-script' });
   if (result.attempted && !result.ok) hecUnreachable = true;
 }
@@ -71,7 +77,10 @@ const steps: Step[] = [
     label: 'inject_anthropic_429',
     action: async () => {
       process.env.CHAOS_PRIMARY_DOWN = 'anthropic';
-      log('inject_anthropic_429', { toxic: 'anthropic_429', primary: 'anthropic/claude-sonnet-4-5' });
+      log('inject_anthropic_429', {
+        toxic: 'anthropic_429',
+        primary: 'anthropic/claude-sonnet-4-5',
+      });
       await emit({
         event: 'chaos_inject',
         toxic: 'anthropic_429',
@@ -104,7 +113,7 @@ const steps: Step[] = [
     at_seconds: 80,
     label: 'restore_all',
     action: async () => {
-      delete process.env.CHAOS_PRIMARY_DOWN;
+      process.env.CHAOS_PRIMARY_DOWN = undefined;
       process.env.CHAOS_MCP_ERROR_RATE = '0';
       log('restore_all', { primary: 'restored', mcp: 'restored' });
       await emit({

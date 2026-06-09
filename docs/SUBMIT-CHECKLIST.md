@@ -31,7 +31,7 @@ Estimated user time at submit (assuming repo + video are ready): **~15 minutes**
 
 ### Tests + types + lint
 
-- [ ] `bun test` -> **68 pass, 0 fail** (~1.2s)
+- [ ] `bun test` -> **111 pass, 0 fail, 347 expect() calls** (~1.7s)
 - [ ] `bun x tsc --noEmit` -> exit code 0 (no type errors)
 - [ ] `bun run lint` if defined in `package.json` -> exit code 0 (Biome clean)
 
